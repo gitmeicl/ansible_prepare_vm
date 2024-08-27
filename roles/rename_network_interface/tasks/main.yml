@@ -1,0 +1,25 @@
+# roles/rename_network_interface/tasks/main.yml
+---
+- name: Get the active network interface
+  ansible.builtin.shell: |
+    set -o pipefail
+    ip route | grep default | awk '{print $5}'
+  register: active_interface
+  changed_when: false
+
+- name: Rename the network interface to net0
+  ansible.builtin.shell: |
+    ip link set dev {{ active_interface.stdout }} down
+    ip link set dev {{ active_interface.stdout }} name net0
+    ip link set dev net0 up
+  become: true
+  changed_when: "{{ active_interface.stdout != 'net0' }}"
+
+- name: Show information about the renamed interface
+  ansible.builtin.command: ip addr show dev net0
+  register: net0_info
+  changed_when: false
+
+- name: Display the information about the renamed interface
+  ansible.builtin.debug:
+    msg: "{{ net0_info.stdout }}"

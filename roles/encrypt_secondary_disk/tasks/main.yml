@@ -1,0 +1,47 @@
+---
+- name: Ensure the secondary disk is available
+  ansible.builtin.fail:
+    msg: "The specified disk {{ disk_device }} does not exist."
+  when: ansible_devices[disk_device] is not defined
+
+- name: Create a partition on the secondary disk
+  community.general.parted:
+    device: "{{ disk_device }}"
+    number: 1
+    state: present
+    part_type: primary
+    fs_type: ext4
+  when: ansible_devices[disk_device].partitions is defined and
+        ansible_devices[disk_device].partitions | length == 0
+
+- name: Encrypt the partition on the secondary disk
+  ansible.builtin.command: "cryptsetup luksFormat {{ disk_device }}1"
+  args:
+    creates: "/dev/mapper/encrypted_disk"
+  become: true
+  changed_when: false
+
+- name: Open the encrypted partition
+  ansible.builtin.command: "cryptsetup open {{ disk_device }}1 encrypted_disk"
+  become: true
+  changed_when: false
+
+- name: Create a filesystem on the encrypted partition
+  community.general.filesystem:
+    fstype: ext4
+    dev: /dev/mapper/encrypted_disk
+
+- name: Update /etc/fstab to mount the encrypted partition
+  ansible.builtin.blockinfile:
+    path: /etc/fstab
+    block: |
+      /dev/mapper/encrypted_disk  /mnt/encrypted_disk  ext4  defaults  0  0
+  become: true
+
+- name: Ensure the encrypted partition is mounted
+  ansible.posix.mount:
+    path: /mnt/encrypted_disk
+    src: /dev/mapper/encrypted_disk
+    fstype: ext4
+    state: mounted
+  become: true

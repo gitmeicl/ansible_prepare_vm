@@ -1,0 +1,21 @@
+---
+- name: Disable C-states for all CPUs
+  ansible.posix.sysctl:
+    name: processor.max_cstate
+    value: '1'
+    state: present
+    sysctl_set: true
+  become: true
+
+- name: Switch CPU governor to performance mode
+  ansible.builtin.shell: |
+    for cpu in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor; do
+      echo performance > $cpu
+    done
+  become: true
+  changed_when: false
+
+- name: Apply changes to CPU governor
+  ansible.builtin.command: cpupower frequency-set -g performance
+  become: true
+  changed_when: false

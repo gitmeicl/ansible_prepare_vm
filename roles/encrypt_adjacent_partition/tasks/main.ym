@@ -1,0 +1,41 @@
+---
+- name: Find the partition adjacent to root
+  shell: |
+    lsblk -rno NAME,TYPE,MOUNTPOINT | awk '$2 == "part" && $3 == "/" {print $1}' | sed 's/[0-9]*$//'
+  register: root_device
+
+- name: Ensure the adjacent partition is available
+  fail:
+    msg: "No adjacent partition found."
+  when: root_device.stdout is undefined or root_device.stdout == ""
+
+- name: Encrypt the adjacent partition
+  command: "cryptsetup luksFormat /dev/{{ root_device.stdout }}2"
+  args:
+    creates: "/dev/mapper/adjacent_partition_encrypted"
+  become: true
+
+- name: Open the encrypted adjacent partition
+  command: "cryptsetup open /dev/{{ root_device.stdout }}2 adjacent_partition_encrypted"
+  become: true
+
+- name: Create a filesystem on the encrypted adjacent partition
+  filesystem:
+    fstype: ext4
+    dev: /dev/mapper/adjacent_partition_encrypted
+
+- name: Update /etc/fstab to mount the adjacent encrypted partition
+  blockinfile:
+    path: /etc/fstab
+    block: |
+      /dev/mapper/adjacent_partition_encrypted  /mnt/adjacent_partition  ext4  defaults  0  0
+  become: true
+
+- name: Ensure the adjacent encrypted partition is mounted
+  mount:
+    path: /mnt/adjacent_partition
+    src: /dev/mapper/adjacent_partition_encrypted
+    fstype: ext4
+    state: mounted
+  become: true
+

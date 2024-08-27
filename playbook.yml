@@ -1,0 +1,11 @@
+---
+- name: Server preparation playbook
+  hosts: all
+  become: true
+
+  roles:
+    - encrypt_secondary_disk
+    - encrypt_adjacent_partition
+    - cpu_optimization
+    - rename_network_interface
+    - display_cpu_info
