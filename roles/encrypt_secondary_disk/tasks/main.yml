@@ -1,5 +1,4 @@
 ---
-# Установка пакета cryptsetup, необходимого для работы с LUKS
 - name: Install cryptsetup package
   ansible.builtin.apt:
     name: cryptsetup
