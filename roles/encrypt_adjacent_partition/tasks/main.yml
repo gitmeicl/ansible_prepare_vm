@@ -1,0 +1,13 @@
+---
+- name: Register partition next to root
+  ansible.builtin.shell: "lsblk -ln | awk '/\\/$/{found=1;next} found && /part/{print $1; exit}'"
+  register: disk_part
+  changed_when: disk_part.rc != 0
+
+# Шифрование диска с помощью community.crypto.luks_device
+- name: Encrypt the disk with LUKS
+  community.crypto.luks_device:
+    name: "/dev/{{ disk_part }}"
+    state: present
+    passphrase: "{{ luks_passphrase }}"
+  notify: Open the encrypted disk

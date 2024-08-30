@@ -1,47 +1,31 @@
 ---
-- name: Ensure the secondary disk is available
-  ansible.builtin.fail:
-    msg: "The specified disk {{ disk_device }} does not exist."
-  when: ansible_devices[disk_device] is not defined
-
-- name: Create a partition on the secondary disk
-  community.general.parted:
-    device: "{{ disk_device }}"
-    number: 1
+# Установка пакета cryptsetup, необходимого для работы с LUKS
+- name: Install cryptsetup package
+  ansible.builtin.apt:
+    name: cryptsetup
     state: present
-    part_type: primary
-    fs_type: ext4
-  when: ansible_devices[disk_device].partitions is defined and
-        ansible_devices[disk_device].partitions | length == 0
+  when: ansible_os_family == "Debian"
 
-- name: Encrypt the partition on the secondary disk
-  ansible.builtin.command: "cryptsetup luksFormat {{ disk_device }}1"
-  args:
-    creates: "/dev/mapper/encrypted_disk"
-  become: true
-  changed_when: false
+- name: Install cryptsetup package
+  ansible.builtin.dnf:
+    name: cryptsetup
+    state: present
+  when: ansible_os_family == "RedHat"
 
-- name: Open the encrypted partition
-  ansible.builtin.command: "cryptsetup open {{ disk_device }}1 encrypted_disk"
-  become: true
-  changed_when: false
+- name: Check if the disk exists
+  ansible.builtin.stat:
+    path: "/dev/{{ disk_to_encrypt }}"
+  register: disk_stat
 
-- name: Create a filesystem on the encrypted partition
-  community.general.filesystem:
-    fstype: ext4
-    dev: /dev/mapper/encrypted_disk
+- name: Fail if the disk does not exist
+  ansible.builtin.fail:
+    msg: "The disk {{ disk_to_encrypt }} does not exist."
+  when: not disk_stat.stat.exists
 
-- name: Update /etc/fstab to mount the encrypted partition
-  ansible.builtin.blockinfile:
-    path: /etc/fstab
-    block: |
-      /dev/mapper/encrypted_disk  /mnt/encrypted_disk  ext4  defaults  0  0
-  become: true
-
-- name: Ensure the encrypted partition is mounted
-  ansible.posix.mount:
-    path: /mnt/encrypted_disk
-    src: /dev/mapper/encrypted_disk
-    fstype: ext4
-    state: mounted
-  become: true
+- name: Encrypt the disk with LUKS
+  community.crypto.luks_device:
+    name: "/dev/{{ disk_to_encrypt }}"
+    state: present
+    passphrase: "{{ luks_passphrase }}"
+  notify:
+    - Open the encrypted disk

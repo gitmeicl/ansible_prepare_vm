@@ -1,11 +1,20 @@
 ---
-- name: Disable C-states for all CPUs
-  ansible.posix.sysctl:
-    name: processor.max_cstate
-    value: '1'
+- name: Update GRUB configuration to disable C-states
+  ansible.builtin.lineinfile:
+    path: /etc/default/grub
+    regexp: '^GRUB_CMDLINE_LINUX_DEFAULT='
+    line: 'GRUB_CMDLINE_LINUX_DEFAULT="quiet splash intel_idle.max_cstate=0 processor.max_cstate=1"'
     state: present
-    sysctl_set: true
-  become: true
+    backrefs: true
+
+- name: Update GRUB
+  ansible.builtin.shell: /usr/sbin/update-grub
+  args:
+    warn: false
+
+- name: Reboot the server to apply changes
+  ansible.builtin.reboot:
+    reboot_timeout: 300
 
 - name: Switch CPU governor to performance mode
   ansible.builtin.shell: |
@@ -13,9 +22,11 @@
       echo performance > $cpu
     done
   become: true
-  changed_when: false
+  register: cpu_governor
+  changed_when: cpu_governor.rc != 0
 
 - name: Apply changes to CPU governor
   ansible.builtin.command: cpupower frequency-set -g performance
   become: true
-  changed_when: false
+  register: cpu_power
+  changed_when: cpu_power.rc != 0

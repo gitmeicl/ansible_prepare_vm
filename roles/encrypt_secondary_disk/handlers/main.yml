@@ -1,0 +1,7 @@
+---
+- name: Open the encrypted disk
+  community.crypto.luks_device:
+    name: "{{ disk_to_encrypt }}"
+    state: opened
+    passphrase: "{{ luks_passphrase }}"
+    mapper_name: encrypted_disk

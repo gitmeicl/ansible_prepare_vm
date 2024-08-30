@@ -3,4 +3,5 @@ all:
     server1:
       ansible_host: 10.10.10.10
       ansible_user: ubuntu
-      disk_device: "/dev/sdb"
+      disk_to_encrypt: "xvdb"
+      luks_passphrase: "your_secret_password"

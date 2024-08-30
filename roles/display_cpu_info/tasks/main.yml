@@ -2,21 +2,16 @@
 - name: List all CPUs
   ansible.builtin.shell: |
     set -o pipefail
-    lscpu | grep "^CPU(s):"
+    lscpu | grep "^CPU(s):" | awk '{print $2}'
   register: cpu_list
-  changed_when: false
-
-- name: Show CPU list
-  ansible.builtin.debug:
-    msg: "{{ cpu_list.stdout }}"
 
 - name: Check for Intel Hyper-Threading or AMD multithreading
-  ansible.builtin.shell: |
-    set -o pipefail
-    lscpu | grep -E "Thread(s) per core|Core(s) per socket"
-  register: ht_info
-  changed_when: false
+  ansible.builtin.slurp:
+    src: /sys/devices/system/cpu/smt/control
+  register: ht_info_base64
 
-- name: Show Hyper-Threading/Multithreading information
+- name: Show CPU information
   ansible.builtin.debug:
-    msg: "{{ ht_info.stdout }}"
+    msg: >
+      System has {{ cpu_list.stdout }} CPU(s)
+      Intel Hyper-Threading/AMD Multithreading is {{ ht_info_base64['content'] | b64decode }}
